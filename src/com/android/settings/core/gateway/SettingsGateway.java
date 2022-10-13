@@ -178,6 +178,7 @@ import com.android.settings.wifi.details.WifiNetworkDetailsFragment;
 import com.android.settings.wifi.p2p.WifiP2pSettings;
 import com.android.settings.wifi.savedaccesspoints2.SavedAccessPointsWifiSettings2;
 import com.android.settings.wifi.tether.WifiTetherSettings;
+import com.android.settings.display.HdmiSettings;
 
 public class SettingsGateway {
 
@@ -200,6 +201,7 @@ public class SettingsGateway {
             WifiTetherSettings.class.getName(),
             BackgroundCheckSummary.class.getName(),
             VpnSettings.class.getName(),
+            HdmiSettings.class.getName(),
             DataSaverSummary.class.getName(),
             DateTimeSettings.class.getName(),
             LocaleListEditor.class.getName(),
@@ -388,5 +390,7 @@ public class SettingsGateway {
             Settings.MyDeviceInfoActivity.class.getName(),
             Settings.ModuleLicensesActivity.class.getName(),
             UserBackupSettingsActivity.class.getName(),
+            // Home page > Display
+            Settings.HdmiSettingsActivity.class.getName(),
     };
 }
