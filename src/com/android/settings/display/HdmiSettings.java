@@ -99,9 +99,13 @@ public class HdmiSettings extends SettingsPreferenceFragment
     private boolean mResume;
     private long mWaitDialogCountTime;
     private int mRotation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
-    private long mInitTime;
+
+    private final String HDMI_ACTION = "android.intent.action.HDMI_PLUGGED";
+    private final String DP_ACTION = "android.intent.action.DP_PLUGGED";
 
     private HashMap<Integer, DisplayInfo> mDisplayInfoList = new HashMap<Integer, DisplayInfo>();
+
+    private boolean mForceRefresh = false;
 
     enum ITEM_CONTROL {
         SHOW_RESOLUTION_ITEM,//展示分辨率选项
@@ -112,6 +116,7 @@ public class HdmiSettings extends SettingsPreferenceFragment
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(final Message msg) {
+            Log.v(TAG, "handleMessage " + msg.what);
             if (mDestory && MSG_SWITCH_DEVICE_STATUS != msg.what) {
                 return;
             }
@@ -151,6 +156,7 @@ public class HdmiSettings extends SettingsPreferenceFragment
                     hideWaitingDialog();
                 }
                 mEnableDisplayListener = true;
+                Log.v(TAG, "mEnableDisplayListener set true" );
             } else if (MSG_SWITCH_DEVICE_STATUS == msg.what) {
                 final ITEM_CONTROL control = (ITEM_CONTROL) msg.obj;
                 if (SWITCH_STATUS_ON == msg.arg1) {
@@ -206,16 +212,18 @@ public class HdmiSettings extends SettingsPreferenceFragment
         @Override
         public void onReceive(Context ctxt, Intent receivedIt) {
             String action = receivedIt.getAction();
-            String HDMIINTENT = "android.intent.action.HDMI_PLUGGED";
-            if (action.equals(HDMIINTENT)) {
+            if (HDMI_ACTION.equals(action) || DP_ACTION.equals(action)) {
                 boolean state = receivedIt.getBooleanExtra("state", false);
                 if (state) {
                     Log.d(TAG, "BroadcastReceiver.onReceive() : Connected HDMI-TV");
                 } else {
                     Log.d(TAG, "BroadcastReceiver.onReceive() : Disconnected HDMI-TV");
                 }
-                if (mEnableDisplayListener && System.currentTimeMillis() - mInitTime > 2000) {
+                DrmDisplaySetting.updateDisplayInfos();
+                if (mEnableDisplayListener) {
                     refreshState();
+                } else {
+                    mForceRefresh = true;
                 }
             }
         }
@@ -238,7 +246,6 @@ public class HdmiSettings extends SettingsPreferenceFragment
         mDisplayListener = new DisplayListener();
         addPreferencesFromResource(R.xml.hdmi_settings);
                 init();
-        mInitTime = System.currentTimeMillis();
         mEnableDisplayListener = true;
     }
 
@@ -253,10 +260,12 @@ public class HdmiSettings extends SettingsPreferenceFragment
     public void onResume() {
         super.onResume();
         //showWaitingDialog(0, "");
-        IntentFilter filter = new IntentFilter("android.intent.action.HDMI_PLUGGED");
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(HDMI_ACTION);
+        filter.addAction(DP_ACTION);
         getContext().registerReceiver(HdmiListener, filter);
         //refreshState();
-        //mDisplayManager.registerDisplayListener(mDisplayListener, null);
+        mDisplayManager.registerDisplayListener(mDisplayListener, null);
         mResume = true;
     }
 
@@ -286,7 +295,7 @@ public class HdmiSettings extends SettingsPreferenceFragment
         super.onPause();
         mResume = false;
         Log.d(TAG, "onPause----------------");
-        //mDisplayManager.unregisterDisplayListener(mDisplayListener);
+        mDisplayManager.unregisterDisplayListener(mDisplayListener);
         getContext().unregisterReceiver(HdmiListener);
     }
 
@@ -428,11 +437,11 @@ public class HdmiSettings extends SettingsPreferenceFragment
 
     private void updateResolution(final ITEM_CONTROL control, final int index) {
         showWaitingDialog(R.string.dialog_update_resolution);
-        mEnableDisplayListener = false;
         new Thread() {
             @Override
             public void run() {
                 if (ITEM_CONTROL.CHANGE_RESOLUTION == control) {
+                    mEnableDisplayListener = false;
                     synchronized (mLock) {
                         int display = mSelectDisplayInfo.getDisplayNo();
                         DrmDisplaySetting.updateDisplayInfos();
@@ -525,7 +534,19 @@ public class HdmiSettings extends SettingsPreferenceFragment
                 displayInfo.getOrginModes();
         HdmiListPreference resolutionPreference = (HdmiListPreference) findPreference(
                 KEY_PRE_RESOLUTION + displayInfo.getDisplayNo());
-        resolutionPreference.setEntries(modes);
+        String[] enteresModes = new String[]{};
+        if (null != modes) {
+            enteresModes = new String[modes.length];
+            for(int i=0; i < modes.length;i++) {
+                String temp = modes[i];
+                String[] temps = temp.split("-");
+                if (null != temps && temps.length > 1) {
+                    temp = temps[0];
+                }
+                enteresModes[i] = temp;
+            }
+        }
+        resolutionPreference.setEntries(enteresModes);
         resolutionPreference.setEntryValues(modes);
         resolutionPreference.setValue(displayInfo.getCurrentResolution());
         resolutionPreference.showClickDialogItem();
@@ -553,7 +574,13 @@ public class HdmiSettings extends SettingsPreferenceFragment
                                 sendUpdateStateMsg(ITEM_CONTROL.REFRESH_DISPLAY_STATUS_INFO, 1000);
                             }
                         } else if (!USED_OFFON_RESOLUTION) {
+                            mEnableDisplayListener = true;
                             updateStateUI();
+                            if (mForceRefresh) {
+                                mForceRefresh = false;
+                                Log.v(TAG, "force refresh once");
+                                refreshState();
+                            }
                         }
                     }
                 }
@@ -681,7 +708,7 @@ public class HdmiSettings extends SettingsPreferenceFragment
         public void onDisplayAdded(int displayId) {
             Log.v(TAG, "onDisplayAdded displayId=" + displayId);
             if (mEnableDisplayListener) {
-                refreshState();
+//                refreshState();
             }
         }
 
@@ -695,7 +722,7 @@ public class HdmiSettings extends SettingsPreferenceFragment
         public void onDisplayRemoved(int displayId) {
             Log.v(TAG, "onDisplayRemoved displayId=" + displayId);
             if (mEnableDisplayListener) {
-                refreshState();
+//                refreshState();
             }
         }
     }
