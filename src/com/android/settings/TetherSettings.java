@@ -564,6 +564,7 @@ public class TetherSettings extends RestrictedSettingsFragment
             new BluetoothProfile.ServiceListener() {
         public void onServiceConnected(int profile, BluetoothProfile proxy) {
             mBluetoothPan.set((BluetoothPan) proxy);
+            updateBluetoothState();
         }
         public void onServiceDisconnected(int profile) {
             mBluetoothPan.set(null);
