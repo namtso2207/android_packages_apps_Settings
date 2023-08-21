@@ -94,10 +94,10 @@ public class DrmDisplaySetting {
         //        } else {
         int type = manager.getCurrentInterface(display);
         String[] orginModes = manager.getModeList(display, type);
-        orginModes = filterOrginModes(orginModes);
+        String currentMode = manager.getCurrentMode(display, type);
+        orginModes = filterOrginModes(orginModes, currentMode);
         displayInfo.setOrginModes(orginModes);
         displayInfo.setModes(getFilterModeList(orginModes));
-        String currentMode = manager.getCurrentMode(display, type);
         displayInfo.setCurrentResolution(currentMode);
         //        }
     }
@@ -156,7 +156,7 @@ public class DrmDisplaySetting {
 
     private static String tmpSetMode = null;
 
-    private static String[] filterOrginModes(String[] modes) {
+    private static String[] filterOrginModes(String[] modes, String currentMode) {
         if (modes == null)
             return null;
         List<String> filterModeList = new ArrayList<String>();
@@ -171,6 +171,19 @@ public class DrmDisplaySetting {
                 resModeList.add(itemMode);
                 if (!filterModeList.contains(modes[i]))
                     filterModeList.add(modes[i]);
+            } else if (modes[i].equals(currentMode)) {
+                for (int j = 0; j < filterModeList.size(); j++) {
+                    String filterMode = filterModeList.get(j);
+                    endIndex = filterMode.indexOf("-");
+                    if (endIndex > 0)
+                        filterMode = filterMode.substring(0, endIndex);
+                    if (filterMode.equals(itemMode)) {
+                        filterModeList.remove(j);
+                        filterModeList.add(modes[i]);
+                        logd("replace suit mode " + modes[i]);
+                        continue;
+                    }
+                }
             }
         }
         return filterModeList.toArray(new String[0]);
