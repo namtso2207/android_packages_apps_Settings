@@ -33,11 +33,17 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.net.ConnectivityManager;
 import android.net.InetAddresses;
+import android.net.InterfaceConfiguration;
 import android.net.NetworkInfo;
+import android.os.IBinder;
+import android.os.INetworkManagementService;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Message;
+import android.os.RemoteException;
+import android.os.ServiceManager;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -110,6 +116,7 @@ public class EthernetSettings extends SettingsPreferenceFragment
         ETHER_STATE_CONNECTED
     }
 
+    private static final String KEY_ETH_NODES = "ethernet_node";
     private static final String KEY_ETH_IP_ADDRESS = "ethernet_ip_addr";
     private static final String KEY_ETH_HW_ADDRESS = "ethernet_hw_addr";
     private static final String KEY_ETH_NET_MASK = "ethernet_netmask";
@@ -128,6 +135,7 @@ public class EthernetSettings extends SettingsPreferenceFragment
     private final static String nullIpInfo = "0.0.0.0";
 
     private ListPreference mkeyEthMode;
+    private ListPreference ethNodes;
     //    private SwitchPreference mEthCheckBox;
     private CheckBoxPreference staticEthernet;
 
@@ -241,6 +249,7 @@ public class EthernetSettings extends SettingsPreferenceFragment
         refreshUI();
     }
 
+    private INetworkManagementService mNMService;
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -248,6 +257,9 @@ public class EthernetSettings extends SettingsPreferenceFragment
 
         mContext = this.getActivity().getApplicationContext();
         mEthManager = (EthernetManager) getSystemService(Context.ETHERNET_SERVICE);
+
+        IBinder b = ServiceManager.getService(Context.NETWORKMANAGEMENT_SERVICE);
+        mNMService = INetworkManagementService.Stub.asInterface(b);
 
         if (mEthManager == null) {
             Log.e(TAG, "get ethernet manager failed");
@@ -283,6 +295,26 @@ public class EthernetSettings extends SettingsPreferenceFragment
         if (mkeyEthMode == null) {
             mkeyEthMode = (ListPreference) findPreference(KEY_ETH_MODE);
             mkeyEthMode.setOnPreferenceChangeListener(this);
+        }
+
+        if(ethNodes == null) {
+            String[] ifaces = mEthManager.getAvailableInterfaces();
+            Log.i(TAG, "eth num:" + Arrays.toString(ifaces));
+            ethNodes = (ListPreference) findPreference(KEY_ETH_NODES);
+            ethNodes.setEntryValues(ifaces.clone());
+            ethNodes.setEntries(ifaces.clone());
+            ethNodes.setDefaultValue(mIfaceName);
+            ethNodes.setValue(mIfaceName);
+            ethNodes.setSummary(mIfaceName);
+            ethNodes.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    mIfaceName = newValue.toString();
+                    getEthInfo();
+                    refreshUI();
+                    return true;
+                }
+            });
         }
     /*
         if (mEthCheckBox== null) {
@@ -336,8 +368,8 @@ public class EthernetSettings extends SettingsPreferenceFragment
     }
 
     private void refreshUI() {
-
-        //    setStringSummary(KEY_ETH_HW_ADDRESS,mEthHwAddress);
+        setStringSummary(KEY_ETH_NODES, mIfaceName);
+        //setStringSummary(KEY_ETH_HW_ADDRESS, mEthHwAddress);
         setStringSummary(KEY_ETH_IP_ADDRESS, mEthIpAddress);
         setStringSummary(KEY_ETH_NET_MASK, mEthNetmask);
         setStringSummary(KEY_ETH_GATEWAY, mEthGateway);
@@ -575,6 +607,13 @@ public class EthernetSettings extends SettingsPreferenceFragment
              */
             getEthInfoFromStaticIp();
         }
+
+        try {
+            InterfaceConfiguration config = mNMService.getInterfaceConfig(mIfaceName);
+            mEthHwAddress = config.getHardwareAddress();
+        } catch (RemoteException e) {
+            Log.e(TAG, "getHardwareAddress ERROR");
+        }
     }
 
     /*
@@ -613,7 +652,7 @@ public class EthernetSettings extends SettingsPreferenceFragment
 
     /*interface*/
 
-    public getStaticIpInfo mGetStaticIpInfo = new getStaticIpInfo() {
+    public com.android.settings.ethernet.getStaticIpInfo mGetStaticIpInfo = new com.android.settings.ethernet.getStaticIpInfo() {
 
         public boolean getStaticIp(String ipAddr) {
             mEthIpAddress = ipAddr;

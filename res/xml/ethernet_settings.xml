@@ -13,6 +13,10 @@
         android:persistent="false"
         android:disableDependentsState="true" />
   -->
+    <ListPreference
+            android:key="ethernet_node"
+            android:persistent="true"
+            android:title="@string/ethernet_settings" />
   <!--
     <Preference
         style="?android:preferenceInformationStyle"
